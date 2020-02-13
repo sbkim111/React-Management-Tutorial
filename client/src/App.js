@@ -40,8 +40,11 @@ class App extends Component {
 
     const response = await fetch('/api/customers');
     //const response = await axios.get('/api/customers');
-    console.log(fetch('/api/customers'));
+    //console.log(fetch('/api/customers'));
+    //console.log('kbs : '+fetch('/api/customers'));
     const body = await response.json();
+    //const body = await response.data;
+    //console.log('sbs : '+body);
     //const body = await response.data;
     return body;
   }
@@ -67,8 +70,8 @@ class App extends Component {
             </TableRow>
           </TableHead>
           <TableBody>          
-             {this.state.customers ? this.state.customers.map(c => {
-                   return ( <Customer key={c.id} id={c.id} image={c.image} name={c.name} birthday={c.birthday} gender={c.gender} job={c.job} />);
+          {this.state.customers ? this.state.customers.map(c => {
+                   return ( <Customer key={c.ID} ID={c.ID} IMAGE={c.IMAGE} NAME={c.NAME} BIRTHDAY={c.BIRTHDAY} GENDER={c.GENDER} JOB={c.JOB} />);
               }) : 
               <TableRow>
                 <TableCell colSpan="6" align="center">
