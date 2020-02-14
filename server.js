@@ -9,65 +9,105 @@ app.use(bodyParser.urlencoded({ extended: true}));
 
 const oracledb = require('oracledb');
 oracledb.outFormat = oracledb.OBJECT;
+oracledb.autoCommit = true;
 
 const dbConfig = require('./database.js');
 
-oracledb.getConnection(
-    {  
-    user            : dbConfig.user, 
-    password        : dbConfig.password,     
-    connectString   : dbConfig.connectString 
+
+
+app.get('/api/customers', (req, res) => {
+    oracledb.getConnection({  
+        user          : dbConfig.user, 
+        password      : dbConfig.password,     
+        connectString : dbConfig.connectString 
     },     
     function(err, connection) { 
         if (err) {           
-           console.error(err.message);     
-           return;     
+            console.error(err.message);     
+            return;     
         } 
 
-        var query =    
+        let sql =    
             'SELECT * FROM CUSTOMER'; 
     
-        connection.execute(query, [], function (err, result) { 
-           if (err) { 
-              console.error(err.message); 
+        connection.execute(sql, [], function (err, result) { 
+        if (err) { 
+            console.error(err.message); 
 
-              doRelease(connection); 
-              return; 
-           } 
+            doRelease(connection); 
+            return; 
+        } 
     
-           console.log(result.rows);   
-           
-           doRelease(connection, result.rows);
+        //console.log(result.rows);   
+        
+        doRelease(connection, result.rows);
         }); 
         
+    });     
+        
+    function doRelease(connection, userlist) {
+        connection.close(function(err){
+            if(err) {
+                console.error(err.message);
+            }
+
+            //console.log(userlist);
+            res.send(userlist);
+        })
     }
-);     
-    
-function doRelease(connection, userlist) {
-    connection.close(function(err){
+}); 
+
+const multer = require('multer');
+const upload = multer({dest: './upload'});
+
+app.use('/image', express.static('./upload'));
+
+app.post('/api/customers', upload.single('image'), (req, res) => {
+    oracledb.getConnection({
+        user          : dbConfig.user, 
+        password      : dbConfig.password,     
+        connectString : dbConfig.connectString 
+    },
+    function(err, connection) {
         if(err) {
             console.error(err.message);
-        }
+            return;
+        }      
 
-        //console.log('list size: ' + userlist.length);
+        //let sql = 'INSERT INTO CUSTOMER VALUES (customer_seq.nextval, ?, ?, ?, ?, ?)';
+        let sql = 'INSERT INTO CUSTOMER VALUES (customer_seq.nextval, :IMAGE, :NAME, :BIRTHDAY, :GENDER, :JOB)';
+        let image = '/image/' + req.file.filename;
+        let name = req.body.name;
+        let birthday = req.body.birthday;
+        let gender = req.body.gender;
+        let job = req.body.job;
+        let params = [image, name, birthday, gender, job];
 
-        //for(var i=0; i<userlist.length; i++) {
-            //console.log('name: ' + userlist[i][2]);
-            
-        //}
-        //console.log(userlist);
-        //response.send(userlist);
+        console.log('==> userlist insert query');
+        connection.execute(sql, params, function(err, result) {
+            if(err) {
+               
+                console.error(err.message);
+                
+                doRelease(connection);
+                return;
+            }
+            console.log(result);
+            console.log('Rows Insert: ' + result.rowsAffected);
 
-        app.get('/api/customers', (req, res) => {
+            doRelease(connection, result.rowsAffected);
+        });
+    });
 
-            console.log(userlist);
-            res.send(userlist);
-    
-        });        
-        
-    })
-}
+    function doRelease(connection, result) {
+        connection.close(function(err) {
+            if(err) {
+                console.error(err.message);
+            }
 
-
+            res.send(''+result);
+        });
+    };
+});
 
 app.listen(port, () => console.log(`Listening on port ${port}`));
