@@ -12,6 +12,7 @@ oracledb.outFormat = oracledb.OBJECT;
 oracledb.autoCommit = true;
 
 const dbConfig = require('./database.js');
+const ipConfig = require('./ipConfig.js');
 
 
 
@@ -28,7 +29,7 @@ app.get('/api/customers', (req, res) => {
         } 
 
         let sql =    
-            'SELECT * FROM CUSTOMER'; 
+            'SELECT * FROM CUSTOMER WHERE isDeleted = 0 ORDER BY ID DESC'; 
     
         connection.execute(sql, [], function (err, result) { 
         if (err) { 
@@ -58,7 +59,18 @@ app.get('/api/customers', (req, res) => {
 }); 
 
 const multer = require('multer');
-const upload = multer({dest: './upload'});
+//const upload = multer({dest: './upload'});
+
+const upload = multer({
+    storage: multer.diskStorage({
+        destination: function(req, file, cb) {
+            cb(null, './upload');
+        },
+        filename: function(req, file, cb) {
+            cb(null, file.originalname);
+        }
+    })
+})
 
 app.use('/image', express.static('./upload'));
 
@@ -75,8 +87,8 @@ app.post('/api/customers', upload.single('image'), (req, res) => {
         }      
 
         //let sql = 'INSERT INTO CUSTOMER VALUES (customer_seq.nextval, ?, ?, ?, ?, ?)';
-        let sql = 'INSERT INTO CUSTOMER VALUES (customer_seq.nextval, :IMAGE, :NAME, :BIRTHDAY, :GENDER, :JOB)';
-        let image = '/image/' + req.file.filename;
+        let sql = 'INSERT INTO CUSTOMER VALUES (customer_seq.nextval, :IMAGE, :NAME, :BIRTHDAY, :GENDER, :JOB, sysdate, 0)';
+        let image = ipConfig.ip + '/image/' + req.file.originalname;
         let name = req.body.name;
         let birthday = req.body.birthday;
         let gender = req.body.gender;
@@ -94,6 +106,49 @@ app.post('/api/customers', upload.single('image'), (req, res) => {
             }
             console.log(result);
             console.log('Rows Insert: ' + result.rowsAffected);
+
+            doRelease(connection, result.rowsAffected);
+        });
+    });
+
+    function doRelease(connection, result) {
+        connection.close(function(err) {
+            if(err) {
+                console.error(err.message);
+            }
+
+            res.send(''+result);
+        });
+    };
+});
+
+app.delete('/api/customers/:id', (req, res) => {
+    oracledb.getConnection({
+        user          : dbConfig.user, 
+        password      : dbConfig.password,     
+        connectString : dbConfig.connectString 
+    },
+    function(err, connection) {
+        if(err) {
+            console.error(err.message);
+            return;
+        }      
+
+        let sql = 'UPDATE CUSTOMER SET isDeleted = 1 WHERE id = :iD';
+        let params = [req.params.id];
+        console.log(sql);
+        console.log(params);
+        console.log('==> userlist delete query');
+        connection.execute(sql, params, function(err, result) {
+            if(err) {
+               
+                console.error(err.message);
+                
+                doRelease(connection);
+                return;
+            }
+            //console.log(result);
+            console.log('Rows Delete: ' + result.rowsAffected);
 
             doRelease(connection, result.rowsAffected);
         });
